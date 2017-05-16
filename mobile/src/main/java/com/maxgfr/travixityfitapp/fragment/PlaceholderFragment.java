@@ -31,9 +31,11 @@ public class PlaceholderFragment extends Fragment {
     private static int selection;
 
     private ListView listeView;
-    private FitLab fitLab;
+
+    private FitLab lab;
 
     public PlaceholderFragment() {
+        FitLab.getInstance();
     }
 
     /**
@@ -57,24 +59,26 @@ public class PlaceholderFragment extends Fragment {
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         View rootView = inflater.inflate(R.layout.fragment_main, container, false);
+
         listeView = (ListView) rootView.findViewById(R.id.content);
-        fitLab = new FitLab();
 
         selection = this.getArguments().getInt(ARG_SECTION_NUMBER);
 
+        lab = FitLab.getInstance();
+
         switch (selection) {
             case 1:
-                ArrayAdapter<String> adapter = new ArrayAdapter<String>(getActivity(), android.R.layout.simple_expandable_list_item_1, android.R.id.text1, fitLab.getActivityRecognition());
+                ArrayAdapter<String> adapter = new ArrayAdapter<String>(getActivity(), android.R.layout.simple_expandable_list_item_1, android.R.id.text1, lab.getActivityRecognition());
                 listeView.setAdapter(adapter);
                 break;
 
             case 2:
-                ArrayAdapter<String> adapter2 = new ArrayAdapter<String>(getActivity(), android.R.layout.simple_expandable_list_item_1, android.R.id.text1, fitLab.getStepActivity());
+                ArrayAdapter<String> adapter2 = new ArrayAdapter<String>(getActivity(), android.R.layout.simple_expandable_list_item_1, android.R.id.text1, lab.getStepActivity());
                 listeView.setAdapter(adapter2);
                 break;
 
             case 3:
-                ArrayAdapter<String> adapter3 = new ArrayAdapter<String>(getActivity(), android.R.layout.simple_expandable_list_item_1, android.R.id.text1, fitLab.getTimeActivity());
+                ArrayAdapter<String> adapter3 = new ArrayAdapter<String>(getActivity(), android.R.layout.simple_expandable_list_item_1, android.R.id.text1, lab.getTimeActivity());
                 listeView.setAdapter(adapter3);
                 break;
 

@@ -1,5 +1,6 @@
 package com.maxgfr.travixityfitapp;
 
+import android.app.PendingIntent;
 import android.content.Intent;
 import android.content.IntentSender;
 import android.support.annotation.NonNull;
@@ -28,7 +29,11 @@ import com.google.android.gms.fitness.request.DataSourcesRequest;
 import com.google.android.gms.fitness.request.OnDataPointListener;
 import com.google.android.gms.fitness.request.SensorRequest;
 import com.google.android.gms.fitness.result.DataSourcesResult;
+import com.google.android.gms.location.ActivityRecognition;
+import com.google.android.gms.location.ActivityRecognitionResult;
 import com.maxgfr.travixityfitapp.adapter.SectionsPagerAdapter;
+import com.maxgfr.travixityfitapp.fit.ActivityRecognizedService;
+import com.maxgfr.travixityfitapp.fit.FitLab;
 
 import java.util.concurrent.TimeUnit;
 
@@ -61,6 +66,10 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
 
     private GoogleApiClient mApiClient;
 
+    private GoogleApiClient mApiClient2;
+
+    private FitLab lab;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -88,12 +97,20 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
                 .addOnConnectionFailedListener(this)
                 .build();
 
+        mApiClient2 = new GoogleApiClient.Builder(this)
+                .addApi(ActivityRecognition.API)
+                .addConnectionCallbacks(this)
+                .addOnConnectionFailedListener(this)
+                .build();
+
+        lab = FitLab.getInstance();
     }
 
     @Override
     protected void onStart() {
         super.onStart();
         mApiClient.connect();
+        mApiClient2.connect();
     }
 
     @Override
@@ -116,6 +133,11 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
 
         Fitness.SensorsApi.findDataSources(mApiClient, dataSourceRequest)
                 .setResultCallback(dataSourcesResultCallback);
+
+        //API Service 2
+        Intent intent = new Intent( this, ActivityRecognizedService.class );
+        PendingIntent pendingIntent = PendingIntent.getService( this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT );
+        ActivityRecognition.ActivityRecognitionApi.requestActivityUpdates( mApiClient2, 3000, pendingIntent );
     }
 
     @Override
@@ -123,14 +145,16 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
 
     }
 
+
+
     @Override
     public void onDataPoint(DataPoint dataPoint) {
-        for( final Field field : dataPoint.getDataType().getFields() ) {
+        for(final Field field : dataPoint.getDataType().getFields() ) {
             final Value value = dataPoint.getValue( field );
             runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    Toast.makeText(getApplicationContext(), "Field: " + field.getName() + " Value: " + value, Toast.LENGTH_SHORT).show();
+                    lab.addStepActivity("Field: " + field.getName() + " Value: " + value);
                 }
             });
         }
@@ -150,25 +174,6 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
         } else {
             Log.e("GoogleFit", "requestCode NOT request_oauth");
         }
-    }
-
-    private void registerFitnessDataListener(DataSource dataSource, DataType dataType) {
-
-        SensorRequest request = new SensorRequest.Builder()
-                .setDataSource( dataSource )
-                .setDataType( dataType )
-                .setSamplingRate( 3, TimeUnit.SECONDS )
-                .build();
-
-        Fitness.SensorsApi.add( mApiClient, request, this )
-                .setResultCallback(new ResultCallback<Status>() {
-                    @Override
-                    public void onResult(Status status) {
-                        if (status.isSuccess()) {
-                            Log.e( "GoogleFit", "SensorApi successfully added" );
-                        }
-                    }
-                });
     }
 
     @Override
@@ -205,4 +210,24 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
         super.onSaveInstanceState(outState);
         outState.putBoolean(AUTH_PENDING, authInProgress);
     }
+
+    private void registerFitnessDataListener(DataSource dataSource, DataType dataType) {
+
+        SensorRequest request = new SensorRequest.Builder()
+                .setDataSource( dataSource )
+                .setDataType( dataType )
+                .setSamplingRate( 3, TimeUnit.SECONDS )
+                .build();
+
+        Fitness.SensorsApi.add( mApiClient, request, this )
+                .setResultCallback(new ResultCallback<Status>() {
+                    @Override
+                    public void onResult(Status status) {
+                        if (status.isSuccess()) {
+                            Log.e( "GoogleFit", "SensorApi successfully added" );
+                        }
+                    }
+                });
+    }
+
 }
