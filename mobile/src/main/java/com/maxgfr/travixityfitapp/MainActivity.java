@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.content.IntentSender;
 import android.support.annotation.NonNull;
 import android.support.design.widget.TabLayout;
+import android.support.v4.widget.SwipeRefreshLayout;
 import android.support.v7.app.AppCompatActivity;
 
 import android.support.v4.app.FragmentPagerAdapter;
@@ -57,6 +58,7 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
      */
     private ViewPager mViewPager;
 
+    private SwipeRefreshLayout mSwipeRefreshLayout;
 
     private static final int REQUEST_OAUTH = 1;
 
@@ -83,6 +85,9 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
         mViewPager = (ViewPager) findViewById(R.id.container);
         mViewPager.setAdapter(mSectionsPagerAdapter);
 
+        //TheRefreshLayout
+        mSwipeRefreshLayout = (SwipeRefreshLayout) findViewById(R.id.swiperefresh);
+
         TabLayout tabLayout = (TabLayout) findViewById(R.id.tabs);
         tabLayout.setupWithViewPager(mViewPager);
 
@@ -104,7 +109,34 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
                 .build();
 
         lab = FitLab.getInstance();
+
+        /*
+        * Sets up a SwipeRefreshLayout.OnRefreshListener that is invoked when the user
+        * performs a swipe-to-refresh gesture.
+        */
+        mSwipeRefreshLayout.setOnRefreshListener(
+                new SwipeRefreshLayout.OnRefreshListener() {
+            @Override
+            public void onRefresh() {
+                Log.i("RefreshButton", "onRefresh called from SwipeRefreshLayout");
+                // This method performs the actual data-refresh operation.
+                // The method calls setRefreshing(false) when it's finished.
+                refreshContent();
+            }
+        });
     }
+
+    private void refreshContent(){
+        new Handler().postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                mAdapter = new ArrayAdapter<String>(MainActivity.this, android.R.layout.simple_list_item_1, getNewTweets());
+                mListView.setAdapter(mAdapter);
+                mSwipeRefreshLayout.setRefreshing(false);
+            });
+        }
+    }
+
 
     @Override
     protected void onStart() {
@@ -154,7 +186,8 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
             runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    lab.addStepActivity("Field: " + field.getName() + " Value: " + value);
+                    String res = "Field: " + field.getName() + " Value: " + value;
+                    lab.addStepActivity(res);
                 }
             });
         }
@@ -229,5 +262,6 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
                     }
                 });
     }
+
 
 }

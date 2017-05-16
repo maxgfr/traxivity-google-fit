@@ -77,7 +77,7 @@ public class ActivityRecognizedService extends IntentService {
                     break;
                 }
                 case DetectedActivity.STILL: {
-                    Log.e( "ActivityRecogition", "Still: " + activity.getConfidence() );
+                    Log.e("ActivityRecogition", "Still: " + activity.getConfidence() );
                     if( activity.getConfidence() >= 75 ) {
                         lab.addActivityRecognition(date+"You'don't moove");
                     }
