@@ -6,6 +6,7 @@ package com.maxgfr.travixityfitapp.fragment;
 
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
+import android.support.v4.widget.SwipeRefreshLayout;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -32,7 +33,11 @@ public class PlaceholderFragment extends Fragment {
 
     private ListView listeView;
 
+    private SwipeRefreshLayout mSwipeRefreshLayout;
+
     private FitLab lab;
+
+    private ArrayAdapter<String> adapter,adapter2,adapter3;
 
     public PlaceholderFragment() {
         FitLab.getInstance();
@@ -62,23 +67,41 @@ public class PlaceholderFragment extends Fragment {
 
         listeView = (ListView) rootView.findViewById(R.id.content);
 
+        //TheRefreshLayout : the button to reload
+        mSwipeRefreshLayout = (SwipeRefreshLayout) rootView.findViewById (R.id.swiperefresh);
+
         selection = this.getArguments().getInt(ARG_SECTION_NUMBER);
+
+        /*
+        * Sets up a SwipeRefreshLayout.OnRefreshListener that is invoked when the user
+        * performs a swipe-to-refresh gesture.
+        */
+        mSwipeRefreshLayout.setOnRefreshListener(
+                new SwipeRefreshLayout.OnRefreshListener() {
+                    @Override
+                    public void onRefresh() {
+                        Log.i("RefreshButton", "onRefresh called from SwipeRefreshLayout");
+                        // This method performs the actual data-refresh operation.
+                        // The method calls setRefreshing(false) when it's finished.
+                        refreshContent();
+                    }
+                });
 
         lab = FitLab.getInstance();
 
         switch (selection) {
             case 1:
-                ArrayAdapter<String> adapter = new ArrayAdapter<String>(getActivity(), android.R.layout.simple_expandable_list_item_1, android.R.id.text1, lab.getActivityRecognition());
+                adapter = new ArrayAdapter<String>(getActivity(), android.R.layout.simple_expandable_list_item_1, android.R.id.text1, lab.getActivityRecognition());
                 listeView.setAdapter(adapter);
                 break;
 
             case 2:
-                ArrayAdapter<String> adapter2 = new ArrayAdapter<String>(getActivity(), android.R.layout.simple_expandable_list_item_1, android.R.id.text1, lab.getStepActivity());
+                adapter2 = new ArrayAdapter<String>(getActivity(), android.R.layout.simple_expandable_list_item_1, android.R.id.text1, lab.getStepActivity());
                 listeView.setAdapter(adapter2);
                 break;
 
             case 3:
-                ArrayAdapter<String> adapter3 = new ArrayAdapter<String>(getActivity(), android.R.layout.simple_expandable_list_item_1, android.R.id.text1, lab.getTimeActivity());
+                adapter3 = new ArrayAdapter<String>(getActivity(), android.R.layout.simple_expandable_list_item_1, android.R.id.text1, lab.getTimeActivity());
                 listeView.setAdapter(adapter3);
                 break;
 
@@ -86,5 +109,16 @@ public class PlaceholderFragment extends Fragment {
                 Log.e("TAG", "Section inconnue: " + getArguments().getInt(ARG_SECTION_NUMBER));
         }
         return rootView;
+    }
+
+    public void refreshContent () {
+        adapter.notifyDataSetChanged();
+        listeView.setAdapter(adapter);
+        /*for (String s : lab.getActivityRecognition()) { //TEST
+            System.out.println(s);
+        }*/
+        //adapter2.notifyDataSetChanged();
+        //adapter3.notifyDataSetChanged();
+        mSwipeRefreshLayout.setRefreshing(false);
     }
 }

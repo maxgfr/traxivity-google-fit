@@ -3,8 +3,12 @@ package com.maxgfr.travixityfitapp;
 import android.app.PendingIntent;
 import android.content.Intent;
 import android.content.IntentSender;
+import android.content.pm.PackageManager;
 import android.support.annotation.NonNull;
+import android.support.design.widget.Snackbar;
 import android.support.design.widget.TabLayout;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.support.v4.widget.SwipeRefreshLayout;
 import android.support.v7.app.AppCompatActivity;
 
@@ -31,12 +35,15 @@ import com.google.android.gms.fitness.request.OnDataPointListener;
 import com.google.android.gms.fitness.request.SensorRequest;
 import com.google.android.gms.fitness.result.DataSourcesResult;
 import com.google.android.gms.location.ActivityRecognition;
-import com.google.android.gms.location.ActivityRecognitionResult;
 import com.maxgfr.travixityfitapp.adapter.SectionsPagerAdapter;
 import com.maxgfr.travixityfitapp.fit.ActivityRecognizedService;
 import com.maxgfr.travixityfitapp.fit.FitLab;
+import com.maxgfr.travixityfitapp.fit.SensorApi;
+import com.maxgfr.travixityfitapp.fit.StepCounter;
 
 import java.util.concurrent.TimeUnit;
+
+import static android.Manifest.permission.ACCESS_FINE_LOCATION;
 
 public class MainActivity extends AppCompatActivity implements OnDataPointListener,
         GoogleApiClient.ConnectionCallbacks,
@@ -58,8 +65,6 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
      */
     private ViewPager mViewPager;
 
-    private SwipeRefreshLayout mSwipeRefreshLayout;
-
     private static final int REQUEST_OAUTH = 1;
 
     private static final String AUTH_PENDING = "auth_state_pending";
@@ -70,7 +75,13 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
 
     private GoogleApiClient mApiClient2;
 
+    private static final int REQUEST_PERMISSIONS_REQUEST_CODE = 34;
+
     private FitLab lab;
+
+    //private SensorApi sensor;
+
+    private StepCounter step;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -85,9 +96,6 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
         mViewPager = (ViewPager) findViewById(R.id.container);
         mViewPager.setAdapter(mSectionsPagerAdapter);
 
-        //TheRefreshLayout
-        mSwipeRefreshLayout = (SwipeRefreshLayout) findViewById(R.id.swiperefresh);
-
         TabLayout tabLayout = (TabLayout) findViewById(R.id.tabs);
         tabLayout.setupWithViewPager(mViewPager);
 
@@ -95,54 +103,22 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
             authInProgress = savedInstanceState.getBoolean(AUTH_PENDING);
         }
 
-        mApiClient = new GoogleApiClient.Builder(this)
-                .addApi(Fitness.SENSORS_API)
-                .addScope(new Scope(Scopes.FITNESS_ACTIVITY_READ_WRITE))
-                .addConnectionCallbacks(this)
-                .addOnConnectionFailedListener(this)
-                .build();
-
-        mApiClient2 = new GoogleApiClient.Builder(this)
-                .addApi(ActivityRecognition.API)
-                .addConnectionCallbacks(this)
-                .addOnConnectionFailedListener(this)
-                .build();
+        // When permissions are revoked the app is restarted so onCreate is sufficient to check for
+        // permissions core to the Activity's functionality.
+        if (!checkPermission()) {
+            requestPermission();
+        }
 
         lab = FitLab.getInstance();
 
-        /*
-        * Sets up a SwipeRefreshLayout.OnRefreshListener that is invoked when the user
-        * performs a swipe-to-refresh gesture.
-        */
-        mSwipeRefreshLayout.setOnRefreshListener(
-                new SwipeRefreshLayout.OnRefreshListener() {
-            @Override
-            public void onRefresh() {
-                Log.i("RefreshButton", "onRefresh called from SwipeRefreshLayout");
-                // This method performs the actual data-refresh operation.
-                // The method calls setRefreshing(false) when it's finished.
-                refreshContent();
-            }
-        });
-    }
+        step = new StepCounter();
 
-    private void refreshContent(){
-        new Handler().postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                mAdapter = new ArrayAdapter<String>(MainActivity.this, android.R.layout.simple_list_item_1, getNewTweets());
-                mListView.setAdapter(mAdapter);
-                mSwipeRefreshLayout.setRefreshing(false);
-            });
-        }
-    }
+        buildActivityRecognition();
 
+        buildFitnessClient();
 
-    @Override
-    protected void onStart() {
-        super.onStart();
-        mApiClient.connect();
-        mApiClient2.connect();
+        buildSensor();
+
     }
 
     @Override
@@ -172,25 +148,28 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
         ActivityRecognition.ActivityRecognitionApi.requestActivityUpdates( mApiClient2, 3000, pendingIntent );
     }
 
+    private void registerFitnessDataListener(DataSource dataSource, DataType dataType) {
+
+        SensorRequest request = new SensorRequest.Builder()
+                .setDataSource( dataSource )
+                .setDataType( dataType )
+                .setSamplingRate( 3, TimeUnit.SECONDS )
+                .build();
+
+        Fitness.SensorsApi.add( mApiClient, request, this )
+                .setResultCallback(new ResultCallback<Status>() {
+                    @Override
+                    public void onResult(Status status) {
+                        if (status.isSuccess()) {
+                            Log.e( "GoogleFit", "SensorApi successfully added" );
+                        }
+                    }
+                });
+    }
+
     @Override
     public void onConnectionSuspended(int i) {
 
-    }
-
-
-
-    @Override
-    public void onDataPoint(DataPoint dataPoint) {
-        for(final Field field : dataPoint.getDataType().getFields() ) {
-            final Value value = dataPoint.getValue( field );
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    String res = "Field: " + field.getName() + " Value: " + value;
-                    lab.addStepActivity(res);
-                }
-            });
-        }
     }
 
     @Override
@@ -223,6 +202,116 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
         }
     }
 
+    /**
+     * Build a {@link GoogleApiClient} to authenticate the user and allow the application
+     * to connect to the Fitness APIs. The included scopes should match the scopes needed
+     * by your app (see the documentation for details).
+     * Use the {@link GoogleApiClient.OnConnectionFailedListener}
+     * to resolve authentication failures (for example, the user has not signed in
+     * before, or has multiple accounts and must specify which account to use).
+     */
+    private void buildFitnessClient() {
+        // Create the Google API Client
+        GoogleApiClient gClient = new GoogleApiClient.Builder(this)
+                .addApi(Fitness.RECORDING_API)
+                .addApi(Fitness.HISTORY_API)
+                .addScope(new Scope(Scopes.FITNESS_ACTIVITY_READ_WRITE))
+                .addConnectionCallbacks(
+                        new GoogleApiClient.ConnectionCallbacks() {
+
+                            @Override
+                            public void onConnected(Bundle bundle) {
+                                Log.i("StepCounter", "Connected!!!");
+                                // Now you can make calls to the Fitness APIs.  What to do?
+                                // Subscribe to some data sources!
+                                step.subscribe();
+                            }
+
+                            @Override
+                            public void onConnectionSuspended(int i) {
+                                // If your connection to the sensor gets lost at some point,
+                                // you'll be able to determine the reason and react to it here.
+                                if (i == GoogleApiClient.ConnectionCallbacks.CAUSE_NETWORK_LOST) {
+                                    Log.w("StepCounter", "Connection lost.  Cause: Network Lost.");
+                                } else if (i == GoogleApiClient.ConnectionCallbacks.CAUSE_SERVICE_DISCONNECTED) {
+                                    Log.w("StepCounter", "Connection lost.  Reason: Service Disconnected");
+                                }
+                            }
+                        }
+                )
+                .enableAutoManage(this, 0, new GoogleApiClient.OnConnectionFailedListener() {
+                    @Override
+                    public void onConnectionFailed(ConnectionResult result) {
+                        Log.w("StepCounter", "Google Play services connection failed. Cause: " +
+                                result.toString());
+                        Snackbar.make(
+                                MainActivity.this.findViewById(R.id.main_content),
+                                "Exception while connecting to Google Play services: " +
+                                        result.getErrorMessage(),
+                                Snackbar.LENGTH_INDEFINITE).show();
+                    }
+                })
+                .build();
+        step.setClient(gClient);
+    }
+
+    private void buildActivityRecognition () {
+        mApiClient2 = new GoogleApiClient.Builder(this)
+                .addApi(ActivityRecognition.API)
+                .addConnectionCallbacks(this)
+                .addOnConnectionFailedListener(this)
+                .build();
+        mApiClient2.connect();
+    }
+
+    private void buildSensor() {
+        mApiClient = new GoogleApiClient.Builder(this)
+                .addApi(Fitness.SENSORS_API)
+                .addScope(new Scope(Scopes.FITNESS_ACTIVITY_READ_WRITE))
+                .addConnectionCallbacks(this)
+                .addOnConnectionFailedListener(this)
+                .build();
+        mApiClient.connect();
+    }
+
+    private boolean checkPermission() {
+        int result = ContextCompat.checkSelfPermission(getApplicationContext(), ACCESS_FINE_LOCATION);
+        return result == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void requestPermission() {
+        ActivityCompat.requestPermissions(this, new String[]{ACCESS_FINE_LOCATION}, REQUEST_PERMISSIONS_REQUEST_CODE);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
+        switch (requestCode) {
+            case REQUEST_PERMISSIONS_REQUEST_CODE:
+                if (grantResults.length > 0) {
+                    boolean storageAccepted = grantResults[0] == PackageManager.PERMISSION_GRANTED;
+                    if (storageAccepted){
+                        Snackbar.make(mViewPager, "Storage permission granted.", Snackbar.LENGTH_LONG).show();
+                    } else {
+                        Snackbar.make(mViewPager, "Storage permission denied.", Snackbar.LENGTH_LONG).show();
+                    }
+                }
+                break;
+        }
+    }
+
+    @Override
+    public void onDataPoint(DataPoint dataPoint) {
+        for( final Field field : dataPoint.getDataType().getFields() ) {
+            final Value value = dataPoint.getValue( field );
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    Toast.makeText(getApplicationContext(), "Field: " + field.getName() + " Value: " + value, Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+    }
+
     @Override
     protected void onStop() {
         super.onStop();
@@ -243,25 +332,4 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
         super.onSaveInstanceState(outState);
         outState.putBoolean(AUTH_PENDING, authInProgress);
     }
-
-    private void registerFitnessDataListener(DataSource dataSource, DataType dataType) {
-
-        SensorRequest request = new SensorRequest.Builder()
-                .setDataSource( dataSource )
-                .setDataType( dataType )
-                .setSamplingRate( 3, TimeUnit.SECONDS )
-                .build();
-
-        Fitness.SensorsApi.add( mApiClient, request, this )
-                .setResultCallback(new ResultCallback<Status>() {
-                    @Override
-                    public void onResult(Status status) {
-                        if (status.isSuccess()) {
-                            Log.e( "GoogleFit", "SensorApi successfully added" );
-                        }
-                    }
-                });
-    }
-
-
 }
