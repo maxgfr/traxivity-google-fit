@@ -8,17 +8,21 @@ import java.util.ArrayList;
 
 public class FitLab {
 
+    public FitLab () {
+
+    }
 
     public ArrayList<String> getActivityRecognition() {
-        mArtists = (ArrayList<String>) removeDuplicates(mArtists);
-        return mArtists;
+
+        return null;
     }
 
     public ArrayList<String> getStepActivity() {
-        return mAlbums;
+        return null;
     }
 
     public ArrayList<String> getTimeActivity() {
-        return mTitres;
+
+        return null;
     }
 }
