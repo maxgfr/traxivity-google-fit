@@ -111,14 +111,38 @@ public class PlaceholderFragment extends Fragment {
         return rootView;
     }
 
-    public void refreshContent () {
-        adapter.notifyDataSetChanged();
-        listeView.setAdapter(adapter);
-        /*for (String s : lab.getActivityRecognition()) { //TEST
-            System.out.println(s);
-        }*/
-        //adapter2.notifyDataSetChanged();
-        //adapter3.notifyDataSetChanged();
-        mSwipeRefreshLayout.setRefreshing(false);
+    private void refreshContent () {
+        selection = this.getArguments().getInt(ARG_SECTION_NUMBER);
+        switch (selection) {
+            case 1:
+                adapter.notifyDataSetChanged();
+                listeView.setAdapter(adapter);
+                /*for (String s : lab.getActivityRecognition()) { //TEST
+                    System.out.println(s);
+                }*/
+                mSwipeRefreshLayout.setRefreshing(false);
+                break;
+
+            case 2:
+                adapter2.notifyDataSetChanged();
+                listeView.setAdapter(adapter2);
+                /*for (String s : lab.getStepActivity()) { //TEST
+                    System.out.println(s);
+                }*/
+                mSwipeRefreshLayout.setRefreshing(false);
+                break;
+
+            case 3:
+                adapter3.notifyDataSetChanged();
+                listeView.setAdapter(adapter3);
+                /*for (String s : lab.getTimeActivity()) { //TEST
+                    System.out.println(s);
+                }*/
+                mSwipeRefreshLayout.setRefreshing(false);
+                break;
+
+            default:
+                Log.e("TAG", "Section inconnue: " + getArguments().getInt(ARG_SECTION_NUMBER));
+        }
     }
 }
