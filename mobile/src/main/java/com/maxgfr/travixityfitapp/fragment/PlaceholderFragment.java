@@ -11,12 +11,9 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
-import android.widget.TextView;
 
-import com.maxgfr.travixityfitapp.MainActivity;
 import com.maxgfr.travixityfitapp.R;
 import com.maxgfr.travixityfitapp.fit.FitLab;
 
@@ -37,7 +34,7 @@ public class PlaceholderFragment extends Fragment {
 
     private FitLab lab;
 
-    private ArrayAdapter<String> adapter,adapter2,adapter3;
+    private ArrayAdapter<String> adapter,adapter2;
 
     public PlaceholderFragment() {
         FitLab.getInstance();
@@ -100,11 +97,6 @@ public class PlaceholderFragment extends Fragment {
                 listeView.setAdapter(adapter2);
                 break;
 
-            case 3:
-                adapter3 = new ArrayAdapter<String>(getActivity(), android.R.layout.simple_expandable_list_item_1, android.R.id.text1, lab.getTimeActivity());
-                listeView.setAdapter(adapter3);
-                break;
-
             default:
                 Log.e("TAG", "Section inconnue: " + getArguments().getInt(ARG_SECTION_NUMBER));
         }
@@ -127,15 +119,6 @@ public class PlaceholderFragment extends Fragment {
                 adapter2.notifyDataSetChanged();
                 listeView.setAdapter(adapter2);
                 /*for (String s : lab.getStepActivity()) { //TEST
-                    System.out.println(s);
-                }*/
-                mSwipeRefreshLayout.setRefreshing(false);
-                break;
-
-            case 3:
-                adapter3.notifyDataSetChanged();
-                listeView.setAdapter(adapter3);
-                /*for (String s : lab.getTimeActivity()) { //TEST
                     System.out.println(s);
                 }*/
                 mSwipeRefreshLayout.setRefreshing(false);

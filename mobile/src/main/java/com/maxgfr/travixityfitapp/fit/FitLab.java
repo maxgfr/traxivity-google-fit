@@ -13,26 +13,20 @@ public class FitLab {
 
     private ArrayList<String> mActivityRecognition;
     private ArrayList<String> mStepActivity;
-    private ArrayList<String> mTimeActivity;
 
     /** Constructeur privé */
-    private FitLab()
-    {
+    private FitLab() {
         mActivityRecognition = new ArrayList<>();
         mStepActivity = new ArrayList<>();
-        mTimeActivity = new ArrayList<>();
     }
 
     /** Point d'accès pour l'instance unique du singleton */
-    public static synchronized FitLab getInstance()
-    {
+    public static synchronized FitLab getInstance() {
         if (INSTANCE == null)
         { 	INSTANCE = new FitLab();
         }
         return INSTANCE;
     }
-
-
 
     public void addActivityRecognition (String name) {
         mActivityRecognition.add(name);
@@ -40,10 +34,6 @@ public class FitLab {
 
     public void addStepActivity (String name) {
         mStepActivity.add(name);
-    }
-
-    public void addTimeActivity (String name) {
-        mTimeActivity.add(name);
     }
 
     public ArrayList<String> getActivityRecognition() {
@@ -54,7 +44,4 @@ public class FitLab {
         return mStepActivity;
     }
 
-    public ArrayList<String> getTimeActivity() {
-        return mTimeActivity;
-    }
 }
