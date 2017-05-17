@@ -3,8 +3,12 @@ package com.maxgfr.travixityfitapp;
 import android.app.PendingIntent;
 import android.content.Intent;
 import android.content.IntentSender;
+import android.content.pm.PackageManager;
 import android.support.annotation.NonNull;
+import android.support.design.widget.Snackbar;
 import android.support.design.widget.TabLayout;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 
 import android.support.v4.app.FragmentPagerAdapter;
@@ -33,6 +37,7 @@ import com.google.android.gms.location.ActivityRecognition;
 import com.maxgfr.travixityfitapp.adapter.SectionsPagerAdapter;
 import com.maxgfr.travixityfitapp.fit.ActivityRecognizedService;
 import com.maxgfr.travixityfitapp.fit.FitLab;
+import com.maxgfr.travixityfitapp.fit.HistoryService;
 
 import java.util.concurrent.TimeUnit;
 
@@ -43,6 +48,7 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
         GoogleApiClient.OnConnectionFailedListener
 {
 
+    private static final int REQUEST_PERMISSIONS_REQUEST_CODE = 34;
     /**
      * The {@link android.support.v4.view.PagerAdapter} that will provide
      * fragments for each of the sections. We use a
@@ -70,6 +76,8 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
     //Activity Recognitoon Part
     private GoogleApiClient mApiClient2;
 
+    private HistoryService hist;
+
     private FitLab lab;
 
     @Override
@@ -92,7 +100,18 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
             authInProgress = savedInstanceState.getBoolean(AUTH_PENDING);
         }
 
+
+        // When permissions are revoked the app is restarted so onCreate is sufficient to check for
+        // permissions core to the Activity's functionality.
+        if (!checkPermission()) {
+            requestPermission();
+        }
+
         lab = FitLab.getInstance();
+
+        hist = new HistoryService();
+
+        hist.buildFitnessClientHistory(this);
 
         buildActivityRecognition();
 
@@ -196,6 +215,33 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
         super.onSaveInstanceState(outState);
         //Step Part
         outState.putBoolean(AUTH_PENDING, authInProgress);
+    }
+
+    @Override //autorisation pour la position
+    public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
+        switch (requestCode) {
+            case REQUEST_PERMISSIONS_REQUEST_CODE:
+                if (grantResults.length > 0) {
+                    boolean storageAccepted = grantResults[0] == PackageManager.PERMISSION_GRANTED;
+                    if (storageAccepted){
+                        Snackbar.make(mViewPager, "Storage permission granted.", Snackbar.LENGTH_LONG).show();
+                    } else {
+                        Snackbar.make(mViewPager, "Storage permission denied.", Snackbar.LENGTH_LONG).show();
+                    }
+                }
+                break;
+        }
+    }
+
+    //autorisation pour la position
+    private boolean checkPermission() {
+        int result = ContextCompat.checkSelfPermission(getApplicationContext(), ACCESS_FINE_LOCATION);
+        return result == PackageManager.PERMISSION_GRANTED;
+    }
+
+    //autorisation pour la position
+    private void requestPermission() {
+        ActivityCompat.requestPermissions(this, new String[]{ACCESS_FINE_LOCATION}, REQUEST_PERMISSIONS_REQUEST_CODE);
     }
 
     //ActivityRecognitionPart Part
