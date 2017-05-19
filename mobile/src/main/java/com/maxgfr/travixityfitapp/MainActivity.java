@@ -3,19 +3,13 @@ package com.maxgfr.travixityfitapp;
 import android.app.PendingIntent;
 import android.content.Intent;
 import android.content.IntentSender;
-import android.content.pm.PackageManager;
 import android.support.annotation.NonNull;
-import android.support.design.widget.Snackbar;
 import android.support.design.widget.TabLayout;
-import android.support.v4.app.ActivityCompat;
-import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 
-import android.support.v4.app.FragmentPagerAdapter;
 import android.support.v4.view.ViewPager;
 import android.os.Bundle;
 import android.util.Log;
-import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.Scopes;
@@ -24,7 +18,9 @@ import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.common.api.Scope;
 import com.google.android.gms.common.api.Status;
 import com.google.android.gms.fitness.Fitness;
+import com.google.android.gms.fitness.data.Bucket;
 import com.google.android.gms.fitness.data.DataPoint;
+import com.google.android.gms.fitness.data.DataSet;
 import com.google.android.gms.fitness.data.DataSource;
 import com.google.android.gms.fitness.data.DataType;
 import com.google.android.gms.fitness.data.Field;
@@ -41,27 +37,14 @@ import com.maxgfr.travixityfitapp.fit.HistoryService;
 
 import java.util.concurrent.TimeUnit;
 
-import static android.Manifest.permission.ACCESS_FINE_LOCATION;
 
 public class MainActivity extends AppCompatActivity implements OnDataPointListener,
         GoogleApiClient.ConnectionCallbacks,
         GoogleApiClient.OnConnectionFailedListener
 {
 
-    private static final int REQUEST_PERMISSIONS_REQUEST_CODE = 34;
-    /**
-     * The {@link android.support.v4.view.PagerAdapter} that will provide
-     * fragments for each of the sections. We use a
-     * {@link FragmentPagerAdapter} derivative, which will keep every
-     * loaded fragment in memory. If this becomes too memory intensive, it
-     * may be best to switch to a
-     * {@link android.support.v4.app.FragmentStatePagerAdapter}.
-     */
     private SectionsPagerAdapter mSectionsPagerAdapter;
 
-    /**
-     * The {@link ViewPager} that will host the section contents.
-     */
     private ViewPager mViewPager;
 
     private static final int REQUEST_OAUTH = 1;
@@ -70,7 +53,7 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
 
     private boolean authInProgress = false;
 
-    //Step Part
+    //Sensor Fitness Part
     private GoogleApiClient mApiClient;
 
     //Activity Recognitoon Part
@@ -100,16 +83,9 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
             authInProgress = savedInstanceState.getBoolean(AUTH_PENDING);
         }
 
-
-        // When permissions are revoked the app is restarted so onCreate is sufficient to check for
-        // permissions core to the Activity's functionality.
-        if (!checkPermission()) {
-            requestPermission();
-        }
-
         lab = FitLab.getInstance();
 
-        hist = new HistoryService();
+        hist = HistoryService.getInstance();
 
         hist.buildFitnessClientHistory(this);
 
@@ -120,7 +96,7 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
 
     @Override //Both
     public void onConnected(Bundle bundle) {
-        //Step Part
+        //Sensor Fitness Part
         DataSourcesRequest dataSourceRequest = new DataSourcesRequest.Builder()
                 .setDataTypes( DataType.TYPE_STEP_COUNT_CUMULATIVE )
                 .setDataSourceTypes( DataSource.TYPE_RAW )
@@ -146,12 +122,12 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
         ActivityRecognition.ActivityRecognitionApi.requestActivityUpdates( mApiClient2, 3000, pendingIntent );
     }
 
-    @Override //Step Part
+    @Override //Both
     public void onConnectionSuspended(int i) {
 
     }
 
-    @Override //Step Part
+    @Override //Sensor Fitness Part
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         if( requestCode == REQUEST_OAUTH ) {
             authInProgress = false;
@@ -167,7 +143,7 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
         }
     }
 
-    @Override //Step Part
+    @Override //Both
     public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
         if( !authInProgress ) {
             try {
@@ -181,7 +157,7 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
         }
     }
 
-    @Override //Step Part
+    @Override //Sensor Fitness Part
     public void onDataPoint(DataPoint dataPoint) {
         for( final Field field : dataPoint.getDataType().getFields() ) {
             final Value value = dataPoint.getValue( field );
@@ -198,7 +174,7 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
     @Override
     protected void onStop() {
         super.onStop();
-        //Step Part
+        //Sensor Fitness Part
         Fitness.SensorsApi.remove( mApiClient, this )
                 .setResultCallback(new ResultCallback<Status>() {
                     @Override
@@ -213,35 +189,8 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
     @Override
     protected void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
-        //Step Part
+        //Sensor Fitness Part
         outState.putBoolean(AUTH_PENDING, authInProgress);
-    }
-
-    @Override //autorisation pour la position
-    public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
-        switch (requestCode) {
-            case REQUEST_PERMISSIONS_REQUEST_CODE:
-                if (grantResults.length > 0) {
-                    boolean storageAccepted = grantResults[0] == PackageManager.PERMISSION_GRANTED;
-                    if (storageAccepted){
-                        Snackbar.make(mViewPager, "Storage permission granted.", Snackbar.LENGTH_LONG).show();
-                    } else {
-                        Snackbar.make(mViewPager, "Storage permission denied.", Snackbar.LENGTH_LONG).show();
-                    }
-                }
-                break;
-        }
-    }
-
-    //autorisation pour la position
-    private boolean checkPermission() {
-        int result = ContextCompat.checkSelfPermission(getApplicationContext(), ACCESS_FINE_LOCATION);
-        return result == PackageManager.PERMISSION_GRANTED;
-    }
-
-    //autorisation pour la position
-    private void requestPermission() {
-        ActivityCompat.requestPermissions(this, new String[]{ACCESS_FINE_LOCATION}, REQUEST_PERMISSIONS_REQUEST_CODE);
     }
 
     //ActivityRecognitionPart Part
@@ -254,7 +203,7 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
         mApiClient2.connect();
     }
 
-    //Step Part
+    //Sensor Fitness Part
     private void buildSensor() {
         mApiClient = new GoogleApiClient.Builder(this)
                 .addApi(Fitness.SENSORS_API)
@@ -265,7 +214,7 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
         mApiClient.connect();
     }
 
-    //Step Part
+    //Sensor Fitness Part
     private void registerFitnessDataListener(DataSource dataSource, DataType dataType) {
         SensorRequest request = new SensorRequest.Builder()
                 .setDataSource( dataSource )
@@ -283,4 +232,5 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
                     }
                 });
     }
+
 }

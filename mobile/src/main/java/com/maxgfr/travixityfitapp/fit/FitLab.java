@@ -13,11 +13,13 @@ public class FitLab {
 
     private ArrayList<String> mActivityRecognition;
     private ArrayList<String> mStepActivity;
+    private ArrayList<String> mFitActivity;
 
     /** Constructeur privé */
     private FitLab() {
         mActivityRecognition = new ArrayList<>();
         mStepActivity = new ArrayList<>();
+        mFitActivity = new ArrayList<>();
     }
 
     /** Point d'accès pour l'instance unique du singleton */
@@ -36,12 +38,20 @@ public class FitLab {
         mStepActivity.add(name);
     }
 
+    public void addFitActivity (String name) {
+        mFitActivity.add(name);
+    }
+
     public ArrayList<String> getActivityRecognition() {
         return mActivityRecognition;
     }
 
     public ArrayList<String> getStepActivity() {
         return mStepActivity;
+    }
+
+    public ArrayList<String> getFitActivity() {
+        return mFitActivity;
     }
 
 }
