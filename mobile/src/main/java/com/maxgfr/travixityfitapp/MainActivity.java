@@ -98,9 +98,36 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
     public void onConnected(Bundle bundle) {
         //Sensor Fitness Part
         DataSourcesRequest dataSourceRequest = new DataSourcesRequest.Builder()
-                .setDataTypes( DataType.TYPE_STEP_COUNT_CUMULATIVE )
+                .setDataTypes( DataType.TYPE_STEP_COUNT_CUMULATIVE)
                 .setDataSourceTypes( DataSource.TYPE_RAW )
                 .build();
+
+        //to see what local sensor is used.
+        Fitness.SensorsApi.findDataSources(mApiClient, new DataSourcesRequest.Builder()
+                // At least one datatype must be specified.
+                .setDataTypes(DataType.TYPE_STEP_COUNT_CUMULATIVE)
+                // Can specify whether data type is raw or derived.
+                .setDataSourceTypes(DataSource.TYPE_RAW)
+                .build())
+                .setResultCallback(new ResultCallback<DataSourcesResult>() {
+                    @Override
+                    public void onResult(DataSourcesResult dataSourcesResult) {
+                        Log.i("onConnected", "Result: " + dataSourcesResult.getStatus().toString());
+                        for (DataSource dataSource : dataSourcesResult.getDataSources()) {
+                            //Log.i("onConnected", "Data source found: " + dataSource.toString());
+                            //Log.i("onConnected", "Data Source type: " + dataSource.getDataType().getName());
+                            lab.addStepActivity("Data Source type: "+dataSource.getDataType().getName());
+                            lab.addStepActivity("Stream Identifier: "+dataSource.getStreamIdentifier());
+
+                            //Let's register a listener to receive Activity data!
+                            if (dataSource.getDataType().equals(DataType.TYPE_STEP_COUNT_CUMULATIVE)) {
+                                Log.i("onConnected", "Data source for STEP_COUNT found!  Registering.");
+                                registerFitnessDataListener(dataSource,
+                                        DataType.TYPE_STEP_COUNT_CUMULATIVE);
+                            }
+                        }
+                    }
+                });
 
         ResultCallback<DataSourcesResult> dataSourcesResultCallback = new ResultCallback<DataSourcesResult>() {
             @Override
