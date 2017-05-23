@@ -29,7 +29,7 @@ public class SectionsPagerAdapter extends FragmentPagerAdapter {
     }
     @Override
     public int getCount() {
-        // Show 3 total pages.
+        // Show 4 total pages.
         return 3;
     }
 
@@ -39,9 +39,9 @@ public class SectionsPagerAdapter extends FragmentPagerAdapter {
             case 0:
                 return "ACTIVITY RECOGNITION";
             case 1:
-                return "STEPS BY LOCAL SENSOR";
+                return "LOCAL SENSOR";
             case 2:
-                return "STEPS BY GFIT API";
+                return "GFIT API";
         }
         return null;
     }

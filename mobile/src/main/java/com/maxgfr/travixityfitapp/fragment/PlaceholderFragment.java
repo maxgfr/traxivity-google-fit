@@ -38,7 +38,7 @@ public class PlaceholderFragment extends Fragment {
 
     private HistoryService hist;
 
-    private ArrayAdapter<String> adapter,adapter2,adapter3;
+    private ArrayAdapter<String> adapter,adapter2,adapter3,adapter4;
 
     public PlaceholderFragment() {
         FitLab.getInstance();

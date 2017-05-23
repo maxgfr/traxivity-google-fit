@@ -14,10 +14,14 @@ import android.util.Log;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.Scopes;
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.PendingResult;
+import com.google.android.gms.common.api.Result;
 import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.common.api.Scope;
 import com.google.android.gms.common.api.Status;
 import com.google.android.gms.fitness.Fitness;
+import com.google.android.gms.fitness.FitnessStatusCodes;
+import com.google.android.gms.fitness.data.BleDevice;
 import com.google.android.gms.fitness.data.Bucket;
 import com.google.android.gms.fitness.data.DataPoint;
 import com.google.android.gms.fitness.data.DataSet;
@@ -25,9 +29,11 @@ import com.google.android.gms.fitness.data.DataSource;
 import com.google.android.gms.fitness.data.DataType;
 import com.google.android.gms.fitness.data.Field;
 import com.google.android.gms.fitness.data.Value;
+import com.google.android.gms.fitness.request.BleScanCallback;
 import com.google.android.gms.fitness.request.DataSourcesRequest;
 import com.google.android.gms.fitness.request.OnDataPointListener;
 import com.google.android.gms.fitness.request.SensorRequest;
+import com.google.android.gms.fitness.request.StartBleScanRequest;
 import com.google.android.gms.fitness.result.DataSourcesResult;
 import com.google.android.gms.location.ActivityRecognition;
 import com.maxgfr.travixityfitapp.adapter.SectionsPagerAdapter;
@@ -51,17 +57,38 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
 
     private static final String AUTH_PENDING = "auth_state_pending";
 
+    private static final int REQUEST_BLUETOOTH = 1001;
+
     private boolean authInProgress = false;
 
     //Sensor Fitness Part
     private GoogleApiClient mApiClient;
 
-    //Activity Recognitoon Part
+    //Activity Recognition Part
     private GoogleApiClient mApiClient2;
 
     private HistoryService hist;
 
     private FitLab lab;
+
+    private final ResultCallback mResultCallback = new ResultCallback() {
+        @Override
+        public void onResult(@NonNull Result result) {
+            Status status = result.getStatus();
+            if (!status.isSuccess()) {
+                switch (status.getStatusCode()) {
+                    case FitnessStatusCodes.DISABLED_BLUETOOTH:
+                        try {
+                            status.startResolutionForResult(
+                                    MainActivity.this, REQUEST_BLUETOOTH);
+                        } catch (IntentSender.SendIntentException e) {
+
+                        }
+                        break;
+                }
+            }
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -92,10 +119,14 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
         buildActivityRecognition();
 
         buildSensor();
+
     }
 
-    @Override //Both
+    @Override //Sensor + Activity
     public void onConnected(Bundle bundle) {
+
+        startBleScan();
+
         //Sensor Fitness Part
         DataSourcesRequest dataSourceRequest = new DataSourcesRequest.Builder()
                 .setDataTypes( DataType.TYPE_STEP_COUNT_CUMULATIVE)
@@ -149,28 +180,35 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
         ActivityRecognition.ActivityRecognitionApi.requestActivityUpdates( mApiClient2, 3000, pendingIntent );
     }
 
-    @Override //Both
+    @Override //Sensor + Activity
     public void onConnectionSuspended(int i) {
 
     }
 
-    @Override //Sensor Fitness Part
+    @Override //Sensor + Ble
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if( requestCode == REQUEST_OAUTH ) {
-            authInProgress = false;
-            if( resultCode == RESULT_OK ) {
-                if( !mApiClient.isConnecting() && !mApiClient.isConnected() ) {
-                    mApiClient.connect();
+        super.onActivityResult(requestCode, resultCode, data);
+        switch (requestCode) {
+            case REQUEST_BLUETOOTH:
+                startBleScan();
+                Log.e( "onActivityResult", "REQUEST_BLUETOOTH" );
+                break;
+            case REQUEST_OAUTH:
+                authInProgress = false;
+                if( resultCode == RESULT_OK ) {
+                    if( !mApiClient.isConnecting() && !mApiClient.isConnected() ) {
+                        mApiClient.connect();
+                    }
+                } else if( resultCode == RESULT_CANCELED ) {
+                    Log.e( "onActivityResult", "RESULT_CANCELED" );
                 }
-            } else if( resultCode == RESULT_CANCELED ) {
-                Log.e( "GoogleFit", "RESULT_CANCELED" );
-            }
-        } else {
-            Log.e("GoogleFit", "requestCode NOT request_oauth");
+                break;
+            default:
+                Log.e("onActivityResult", "problem");
         }
     }
 
-    @Override //Both
+    @Override //Sensor + Activity
     public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
         if( !authInProgress ) {
             try {
@@ -184,7 +222,7 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
         }
     }
 
-    @Override //Sensor Fitness Part
+    @Override //Sensor Part
     public void onDataPoint(DataPoint dataPoint) {
         for( final Field field : dataPoint.getDataType().getFields() ) {
             final Value value = dataPoint.getValue( field );
@@ -233,6 +271,7 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
     //Sensor Fitness Part
     private void buildSensor() {
         mApiClient = new GoogleApiClient.Builder(this)
+                .addApi(Fitness.BLE_API)
                 .addApi(Fitness.SENSORS_API)
                 .addScope(new Scope(Scopes.FITNESS_ACTIVITY_READ_WRITE))
                 .addConnectionCallbacks(this)
@@ -258,6 +297,70 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
                         }
                     }
                 });
+    }
+
+    //Ble Part
+    private void startBleScan () {
+        // 1. Define a callback object
+        BleScanCallback callback = new BleScanCallback() {
+            @Override
+            public void onDeviceFound(BleDevice device) {
+                // A device that provides the requested data types is available
+                // -> Claim this BLE device (See next example)
+                claimBleDevice(device);
+            }
+            @Override
+            public void onScanStopped() {
+                // The scan timed out or was interrupted
+                Log.e( "startBleScan", "too many times" );
+            }
+        };
+
+        // 2. Create a scan request object:
+        // - Specify the data types you're interested in
+        // - Provide the callback object
+        StartBleScanRequest request = new StartBleScanRequest.Builder()
+                .setDataTypes(DataType.TYPE_STEP_COUNT_CUMULATIVE)
+                .setBleScanCallback(callback)
+                .build();
+
+        // 3. Invoke the Bluetooth Low Energy API with:
+        // - The Google API client
+        // - The scan request
+        PendingResult<Status> pendingResult =
+                Fitness.BleApi.startBleScan(mApiClient, request);
+
+        // 4. Check the result (see other examples)
+        pendingResult.setResultCallback(mResultCallback);
+    }
+
+    //Ble Part
+    private void claimBleDevice (BleDevice bleDevice) {
+        // After the platform invokes your callback
+        // with a compatible BLE device (bleDevice):
+
+        // 1. Invoke the Bluetooth Low Energy API with:
+        // - The Google API client
+        // - The BleDevice object provided in the callback
+        PendingResult<Status> pendingResult =
+                Fitness.BleApi.claimBleDevice(mApiClient, bleDevice);
+
+        // 2. Check the result (see other examples)
+        pendingResult.setResultCallback(mResultCallback);
+    }
+
+    //Ble Part
+    private void unclaimBleDevice (BleDevice bleDevice) {
+        // When you no longer need the BLE device
+
+        // 1. Invoke the Bluetooth Low Energy API with:
+        // - The Google API client
+        // - The BLE device (from the initial scan)
+        PendingResult<Status> pendingResult =
+                Fitness.BleApi.unclaimBleDevice(mApiClient, bleDevice);
+
+        // 2. Check the result (see other examples)
+        pendingResult.setResultCallback(mResultCallback);
     }
 
 }
