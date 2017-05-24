@@ -33,25 +33,18 @@ public class FitLab {
     }
 
     public void addActivityRecognition (String name) {
-        mActivityRecognition.add(name);
-        deleteDoublon(mActivityRecognition);
+        if(!mActivityRecognition.contains(name))
+            mActivityRecognition.add(name);
     }
 
     public void addStepActivity (String name) {
-        mStepActivity.add(name);
-        deleteDoublon(mStepActivity);
+        if(!mStepActivity.contains(name))
+            mStepActivity.add(name);
     }
 
     public void addFitActivity (String name) {
-        mFitActivity.add(name);
-        deleteDoublon(mFitActivity);
-    }
-
-    public void deleteDoublon(ArrayList<String> list) {
-        Set<String> hs = new HashSet<>();
-        hs.addAll(list);
-        list.clear();
-        list.addAll(hs);
+        if(!mFitActivity.contains(name))
+            mFitActivity.add(name);
     }
 
     public ArrayList<String> getActivityRecognition() {
