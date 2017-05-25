@@ -81,6 +81,10 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
     // ShareDailyStep
     private SharedPreferences sharedPrefStep;
 
+    // sharedNbLancementPerDay
+    private SharedPreferences sharedNbLancementPerDay;
+
+
     private HistoryService hist;
 
     private FitLab lab;
@@ -251,11 +255,20 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
                     int nbStepAfterBooting = value.asInt();
 
                     if (tr.isSameDate()) {
-                        readStepOfCurrentDay();
-                        nbStepAfterMidnight = tr.getStepOfCurrentDay() + nbStepAfterBooting;
-                        lab.addStepActivity("Field: " + field.getName() + " Value: " + nbStepAfterMidnight);
+                        readStepOfCurrentDay(); // pour avoir tr.getStepOfCurrentDay()
+
+                        if (readNbLancementPerDay() == 0) { // if it is the first time that we launch the app
+                            nbStepAfterMidnight = tr.getStepOfCurrentDay() + nbStepAfterBooting;
+                            lab.addStepActivity("Field: " + field.getName() + " Value: " + nbStepAfterMidnight);
+                        }
+                        else { //if it is the second or third launch;
+                            nbStepAfterMidnight = nbStepAfterBooting-tr.getStepOfCurrentDay();
+                            lab.addStepActivity("Field: " + field.getName() + " Value: " + nbStepAfterMidnight);
+                        }
+
                     }
                     else {
+                        initialNbLancemenPerDay(); //initialement du nb de lancement par jour
                         tr.setStepOfCurrentDay(nbStepAfterBooting);
                         lab.addStepActivity("Field: " + field.getName() + " Value: " + nbStepAfterBooting);
                     }
@@ -278,6 +291,7 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
                     }
                 });
         saveStepOfCurrentDay(nbStepAfterMidnight);
+        saveNbLancementPerDay();
     }
 
     @Override
@@ -411,6 +425,22 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
         sharedPrefStep = PreferenceManager.getDefaultSharedPreferences(this);
         TimerReset tr = TimerReset.getInstance();
         tr.setStepOfCurrentDay(sharedPrefStep.getInt("THE_STEP_OF_CURRENT_DAY",0));
+    }
+
+    private void saveNbLancementPerDay () {
+        sharedNbLancementPerDay = PreferenceManager.getDefaultSharedPreferences(this);
+        int nb = sharedNbLancementPerDay.getInt("LAUNCH_PER_DAY",0);
+        sharedNbLancementPerDay.edit().putInt("LAUNCH_PER_DAY", nb+1).apply();
+    }
+
+    private int readNbLancementPerDay () {
+        sharedNbLancementPerDay = PreferenceManager.getDefaultSharedPreferences(this);
+        return sharedNbLancementPerDay.getInt("LAUNCH_PER_DAY",0);
+    }
+
+    private void initialNbLancemenPerDay() {
+        sharedNbLancementPerDay = PreferenceManager.getDefaultSharedPreferences(this);
+        sharedNbLancementPerDay.edit().putInt("LAUNCH_PER_DAY", 0).apply();
     }
 
 }
