@@ -1,8 +1,12 @@
 package com.maxgfr.travixityfitapp;
 
 import android.app.PendingIntent;
+import android.content.Context;
 import android.content.Intent;
 import android.content.IntentSender;
+import android.content.SharedPreferences;
+import android.os.SystemClock;
+import android.preference.PreferenceManager;
 import android.support.annotation.NonNull;
 import android.support.design.widget.TabLayout;
 import android.support.v7.app.AppCompatActivity;
@@ -40,7 +44,12 @@ import com.maxgfr.travixityfitapp.adapter.SectionsPagerAdapter;
 import com.maxgfr.travixityfitapp.fit.ActivityRecognizedService;
 import com.maxgfr.travixityfitapp.fit.FitLab;
 import com.maxgfr.travixityfitapp.fit.HistoryService;
+import com.maxgfr.travixityfitapp.fit.TimerReset;
 
+import java.util.Calendar;
+import java.util.Date;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.TimeUnit;
 
 
@@ -59,6 +68,8 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
 
     private static final int REQUEST_BLUETOOTH = 1001;
 
+    private int nbStepAfterMidnight = 0;
+
     private boolean authInProgress = false;
 
     //Sensor Fitness Part
@@ -66,6 +77,9 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
 
     //Activity Recognition Part
     private GoogleApiClient mApiClient2;
+
+    // ShareDailyStep
+    private SharedPreferences sharedPrefStep;
 
     private HistoryService hist;
 
@@ -120,12 +134,14 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
 
         buildSensor();
 
+        readDateLastReboot();
+
     }
 
     @Override //Sensor + Activity
     public void onConnected(Bundle bundle) {
 
-        startBleScan();
+        //startBleScan();
 
         //Sensor Fitness Part
         DataSourcesRequest dataSourceRequest = new DataSourcesRequest.Builder()
@@ -230,7 +246,19 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
                 @Override
                 public void run() {
                     //Toast.makeText(getApplicationContext(), "Field: " + field.getName() + " Value: " + value, Toast.LENGTH_SHORT).show();
-                    lab.addStepActivity("Field: " + field.getName() + " Value: " + value);
+                    TimerReset tr = TimerReset.getInstance();
+
+                    int nbStepAfterBooting = value.asInt();
+
+                    if (tr.isSameDate()) {
+                        readStepOfCurrentDay();
+                        nbStepAfterMidnight = tr.getStepOfCurrentDay() + nbStepAfterBooting;
+                        lab.addStepActivity("Field: " + field.getName() + " Value: " + nbStepAfterMidnight);
+                    }
+                    else {
+                        tr.setStepOfCurrentDay(nbStepAfterBooting);
+                        lab.addStepActivity("Field: " + field.getName() + " Value: " + nbStepAfterBooting);
+                    }
                 }
             });
         }
@@ -249,6 +277,7 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
                         }
                     }
                 });
+        saveStepOfCurrentDay(nbStepAfterMidnight);
     }
 
     @Override
@@ -312,7 +341,7 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
             @Override
             public void onScanStopped() {
                 // The scan timed out or was interrupted
-                Log.e( "startBleScan", "too many times" );
+                Log.e( "startBleScan", "onScanStopped" );
             }
         };
 
@@ -361,6 +390,27 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
 
         // 2. Check the result (see other examples)
         pendingResult.setResultCallback(mResultCallback);
+    }
+
+    private void readDateLastReboot() {
+        //Returns milliseconds since boot, not counting time spent in deep sleep.
+        long time = System.currentTimeMillis()- SystemClock.uptimeMillis();
+        Log.e("readDateLastReboot","Time in milli since the last reboot"+time);
+        Date theDateAfterRestart = new Date(time);
+        TimerReset tr = TimerReset.getInstance();
+        tr.setDateLastReboot(theDateAfterRestart);
+    }
+
+    private void saveStepOfCurrentDay (int nb) {
+        sharedPrefStep = PreferenceManager.getDefaultSharedPreferences(this);
+        TimerReset tr = TimerReset.getInstance();
+        sharedPrefStep.edit().putInt("THE_STEP_OF_CURRENT_DAY", nb).apply();
+    }
+
+    private void readStepOfCurrentDay () {
+        sharedPrefStep = PreferenceManager.getDefaultSharedPreferences(this);
+        TimerReset tr = TimerReset.getInstance();
+        tr.setStepOfCurrentDay(sharedPrefStep.getInt("THE_STEP_OF_CURRENT_DAY",0));
     }
 
 }
