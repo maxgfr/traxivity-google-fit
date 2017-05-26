@@ -63,7 +63,7 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
 
     private static final int REQUEST_BLUETOOTH = 1001;
 
-    private int nbStepPerDay = 0;
+    private int nbStepSaveMidnight = 0;
 
     private boolean authInProgress = false;
 
@@ -77,10 +77,6 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
     private SharedPreferences sharedPrefStep;
 
     private HistoryService hist;
-
-    private int nbStepAfterLaunch;
-
-    private boolean firstTime;
 
     private FitLab lab;
 
@@ -133,11 +129,9 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
 
         buildSensor();
 
-        readStepOfCurrentDay();
+        readStepSaveMidnight();
 
         resetCounter(this);
-
-        firstTime = true;
 
     }
 
@@ -152,37 +146,12 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
                 .setDataSourceTypes( DataSource.TYPE_RAW )
                 .build();
 
-        //to see what local sensor is used.
-        Fitness.SensorsApi.findDataSources(mApiClient, new DataSourcesRequest.Builder()
-                // At least one datatype must be specified.
-                .setDataTypes(DataType.TYPE_STEP_COUNT_CUMULATIVE)
-                // Can specify whether data type is raw or derived.
-                .setDataSourceTypes(DataSource.TYPE_RAW)
-                .build())
-                .setResultCallback(new ResultCallback<DataSourcesResult>() {
-                    @Override
-                    public void onResult(DataSourcesResult dataSourcesResult) {
-                        Log.i("onConnected", "Result: " + dataSourcesResult.getStatus().toString());
-                        for (DataSource dataSource : dataSourcesResult.getDataSources()) {
-                            //Log.i("onConnected", "Data source found: " + dataSource.toString());
-                            //Log.i("onConnected", "Data Source type: " + dataSource.getDataType().getName());
-                            lab.addStepActivity("Data Source type: "+dataSource.getDataType().getName());
-                            lab.addStepActivity("Stream Identifier: "+dataSource.getStreamIdentifier());
-
-                            //Let's register a listener to receive Activity data!
-                            if (dataSource.getDataType().equals(DataType.TYPE_STEP_COUNT_CUMULATIVE)) {
-                                Log.i("onConnected", "Data source for STEP_COUNT found!  Registering.");
-                                registerFitnessDataListener(dataSource,
-                                        DataType.TYPE_STEP_COUNT_CUMULATIVE);
-                            }
-                        }
-                    }
-                });
-
         ResultCallback<DataSourcesResult> dataSourcesResultCallback = new ResultCallback<DataSourcesResult>() {
             @Override
             public void onResult(DataSourcesResult dataSourcesResult) {
                 for( DataSource dataSource : dataSourcesResult.getDataSources() ) {
+                    lab.addStepActivity("Data Source type: "+dataSource.getDataType().getName());
+                    lab.addStepActivity("Stream Identifier: "+dataSource.getStreamIdentifier());
                     if( DataType.TYPE_STEP_COUNT_CUMULATIVE.equals( dataSource.getDataType() ) ) {
                         registerFitnessDataListener(dataSource, DataType.TYPE_STEP_COUNT_CUMULATIVE);
                     }
@@ -249,15 +218,16 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
                 @Override
                 public void run() {
                     //Toast.makeText(getApplicationContext(), "Field: " + field.getName() + " Value: " + value, Toast.LENGTH_SHORT).show();
-                    //lab.addStepActivity("Field: " + field.getName() + " Value: " + value);
-                    int oldValue = nbStepAfterLaunch;
-                    nbStepAfterLaunch = value.asInt();
-                    if (firstTime) {
-                        oldValue = value.asInt();
-                        firstTime = false;
+                    int nbStepOfDay = 0;
+                    if (value.asInt()>nbStepSaveMidnight) {
+                        nbStepOfDay = value.asInt() - nbStepSaveMidnight;
+                    } else {
+                        resetStepSaveMidnight();
+                        nbStepOfDay = value.asInt();
                     }
-                    nbStepPerDay += nbStepAfterLaunch-oldValue;
-                    lab.addStepActivity("Field: " + field.getName() + " Value: " + nbStepPerDay);
+                    ResetBroadcastReceiver r = ResetBroadcastReceiver.getInstance();
+                    r.setStepCumulativeMidnight(nbStepOfDay);
+                    lab.addStepActivity("Field: " + field.getName() + " Value: " + nbStepOfDay);
                 }
             });
         }
@@ -276,7 +246,6 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
                         }
                     }
                 });
-        saveStepOfCurrentDay(nbStepPerDay);
     }
 
     @Override
@@ -336,6 +305,8 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
                 // A device that provides the requested data types is available
                 // -> Claim this BLE device (See next example)
                 claimBleDevice(device);
+
+
             }
             @Override
             public void onScanStopped() {
@@ -391,14 +362,14 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
         pendingResult.setResultCallback(mResultCallback);
     }
 
-    private void saveStepOfCurrentDay (int nb) {
+    private void readStepSaveMidnight () {
         sharedPrefStep = PreferenceManager.getDefaultSharedPreferences(this);
-        sharedPrefStep.edit().putInt("THE_STEP_OF_CURRENT_DAY", nb).apply();
+        nbStepSaveMidnight = sharedPrefStep.getInt("THE_STEP_AT_MIDNIGHT",0);
     }
 
-    private void readStepOfCurrentDay () {
+    private void resetStepSaveMidnight() {
         sharedPrefStep = PreferenceManager.getDefaultSharedPreferences(this);
-        nbStepPerDay = sharedPrefStep.getInt("THE_STEP_OF_CURRENT_DAY",0);
+        sharedPrefStep.edit().remove("THE_STEP_AT_MIDNIGHT").commit();
     }
 
     private void resetCounter(Context context) {
