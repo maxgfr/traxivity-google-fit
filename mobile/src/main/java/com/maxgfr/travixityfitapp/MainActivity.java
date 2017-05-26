@@ -1,11 +1,11 @@
 package com.maxgfr.travixityfitapp;
 
+import android.app.AlarmManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentSender;
 import android.content.SharedPreferences;
-import android.os.SystemClock;
 import android.preference.PreferenceManager;
 import android.support.annotation.NonNull;
 import android.support.design.widget.TabLayout;
@@ -26,9 +26,7 @@ import com.google.android.gms.common.api.Status;
 import com.google.android.gms.fitness.Fitness;
 import com.google.android.gms.fitness.FitnessStatusCodes;
 import com.google.android.gms.fitness.data.BleDevice;
-import com.google.android.gms.fitness.data.Bucket;
 import com.google.android.gms.fitness.data.DataPoint;
-import com.google.android.gms.fitness.data.DataSet;
 import com.google.android.gms.fitness.data.DataSource;
 import com.google.android.gms.fitness.data.DataType;
 import com.google.android.gms.fitness.data.Field;
@@ -44,12 +42,9 @@ import com.maxgfr.travixityfitapp.adapter.SectionsPagerAdapter;
 import com.maxgfr.travixityfitapp.fit.ActivityRecognizedService;
 import com.maxgfr.travixityfitapp.fit.FitLab;
 import com.maxgfr.travixityfitapp.fit.HistoryService;
-import com.maxgfr.travixityfitapp.fit.TimerReset;
+import com.maxgfr.travixityfitapp.fit.ResetBroadcastReceiver;
 
 import java.util.Calendar;
-import java.util.Date;
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.concurrent.TimeUnit;
 
 
@@ -68,7 +63,7 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
 
     private static final int REQUEST_BLUETOOTH = 1001;
 
-    private int nbStepAfterMidnight = 0;
+    private int nbStepPerDay = 0;
 
     private boolean authInProgress = false;
 
@@ -81,11 +76,11 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
     // ShareDailyStep
     private SharedPreferences sharedPrefStep;
 
-    // sharedNbLancementPerDay
-    private SharedPreferences sharedNbLancementPerDay;
-
-
     private HistoryService hist;
+
+    private int nbStepAfterLaunch;
+
+    private boolean firstTime;
 
     private FitLab lab;
 
@@ -138,7 +133,11 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
 
         buildSensor();
 
-        readDateLastReboot();
+        readStepOfCurrentDay();
+
+        resetCounter(this);
+
+        firstTime = true;
 
     }
 
@@ -250,28 +249,15 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
                 @Override
                 public void run() {
                     //Toast.makeText(getApplicationContext(), "Field: " + field.getName() + " Value: " + value, Toast.LENGTH_SHORT).show();
-                    TimerReset tr = TimerReset.getInstance();
-
-                    int nbStepAfterBooting = value.asInt();
-
-                    if (tr.isSameDate()) {
-                        readStepOfCurrentDay(); // pour avoir tr.getStepOfCurrentDay()
-
-                        if (readNbLancementPerDay() == 0) { // if it is the first time that we launch the app
-                            nbStepAfterMidnight = tr.getStepOfCurrentDay() + nbStepAfterBooting;
-                            lab.addStepActivity("Field: " + field.getName() + " Value: " + nbStepAfterMidnight);
-                        }
-                        else { //if it is the second or third launch;
-                            nbStepAfterMidnight = nbStepAfterBooting-tr.getStepOfCurrentDay();
-                            lab.addStepActivity("Field: " + field.getName() + " Value: " + nbStepAfterMidnight);
-                        }
-
+                    //lab.addStepActivity("Field: " + field.getName() + " Value: " + value);
+                    int oldValue = nbStepAfterLaunch;
+                    nbStepAfterLaunch = value.asInt();
+                    if (firstTime) {
+                        oldValue = value.asInt();
+                        firstTime = false;
                     }
-                    else {
-                        initialNbLancemenPerDay(); //initialement du nb de lancement par jour
-                        tr.setStepOfCurrentDay(nbStepAfterBooting);
-                        lab.addStepActivity("Field: " + field.getName() + " Value: " + nbStepAfterBooting);
-                    }
+                    nbStepPerDay += nbStepAfterLaunch-oldValue;
+                    lab.addStepActivity("Field: " + field.getName() + " Value: " + nbStepPerDay);
                 }
             });
         }
@@ -290,8 +276,7 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
                         }
                     }
                 });
-        saveStepOfCurrentDay(nbStepAfterMidnight);
-        saveNbLancementPerDay();
+        saveStepOfCurrentDay(nbStepPerDay);
     }
 
     @Override
@@ -406,41 +391,26 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
         pendingResult.setResultCallback(mResultCallback);
     }
 
-    private void readDateLastReboot() {
-        //Returns milliseconds since boot, not counting time spent in deep sleep.
-        long time = System.currentTimeMillis()- SystemClock.uptimeMillis();
-        Log.e("readDateLastReboot","Time in milli since the last reboot"+time);
-        Date theDateAfterRestart = new Date(time);
-        TimerReset tr = TimerReset.getInstance();
-        tr.setDateLastReboot(theDateAfterRestart);
-    }
-
     private void saveStepOfCurrentDay (int nb) {
         sharedPrefStep = PreferenceManager.getDefaultSharedPreferences(this);
-        TimerReset tr = TimerReset.getInstance();
         sharedPrefStep.edit().putInt("THE_STEP_OF_CURRENT_DAY", nb).apply();
     }
 
     private void readStepOfCurrentDay () {
         sharedPrefStep = PreferenceManager.getDefaultSharedPreferences(this);
-        TimerReset tr = TimerReset.getInstance();
-        tr.setStepOfCurrentDay(sharedPrefStep.getInt("THE_STEP_OF_CURRENT_DAY",0));
+        nbStepPerDay = sharedPrefStep.getInt("THE_STEP_OF_CURRENT_DAY",0);
     }
 
-    private void saveNbLancementPerDay () {
-        sharedNbLancementPerDay = PreferenceManager.getDefaultSharedPreferences(this);
-        int nb = sharedNbLancementPerDay.getInt("LAUNCH_PER_DAY",0);
-        sharedNbLancementPerDay.edit().putInt("LAUNCH_PER_DAY", nb+1).apply();
-    }
-
-    private int readNbLancementPerDay () {
-        sharedNbLancementPerDay = PreferenceManager.getDefaultSharedPreferences(this);
-        return sharedNbLancementPerDay.getInt("LAUNCH_PER_DAY",0);
-    }
-
-    private void initialNbLancemenPerDay() {
-        sharedNbLancementPerDay = PreferenceManager.getDefaultSharedPreferences(this);
-        sharedNbLancementPerDay.edit().putInt("LAUNCH_PER_DAY", 0).apply();
+    private void resetCounter(Context context) {
+        Calendar cal = Calendar.getInstance();
+        cal.set(Calendar.HOUR_OF_DAY, 0);
+        cal.set(Calendar.MINUTE, 0);
+        cal.set(Calendar.SECOND, 0);
+        cal.set(Calendar.MILLISECOND, 0);
+        cal.add(Calendar.DAY_OF_MONTH, 1);
+        PendingIntent pi = PendingIntent.getBroadcast(context, 0, new Intent(context, ResetBroadcastReceiver.class), PendingIntent.FLAG_UPDATE_CURRENT);
+        AlarmManager am = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+        am.setRepeating(AlarmManager.RTC_WAKEUP, cal.getTimeInMillis(), 1000*60*60*24, pi);
     }
 
 }

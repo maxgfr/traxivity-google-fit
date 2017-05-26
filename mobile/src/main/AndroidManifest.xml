@@ -29,6 +29,8 @@
         </activity>
 
         <service android:name=".fit.ActivityRecognizedService" />
+
+        <receiver android:name=".fit.ResetBroadcastReceiver" />
     </application>
 
 </manifest>
