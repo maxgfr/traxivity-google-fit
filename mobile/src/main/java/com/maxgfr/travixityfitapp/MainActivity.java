@@ -80,6 +80,8 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
 
     private FitLab lab;
 
+    public int nbStepOfDay;
+
     private final ResultCallback mResultCallback = new ResultCallback() {
         @Override
         public void onResult(@NonNull Result result) {
@@ -218,7 +220,6 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
                 @Override
                 public void run() {
                     //Toast.makeText(getApplicationContext(), "Field: " + field.getName() + " Value: " + value, Toast.LENGTH_SHORT).show();
-                    int nbStepOfDay = 0;
                     if (value.asInt()>nbStepSaveMidnight) {
                         nbStepOfDay = value.asInt() - nbStepSaveMidnight;
                     } else {
@@ -226,7 +227,7 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
                         nbStepOfDay = value.asInt();
                     }
                     ResetBroadcastReceiver r = ResetBroadcastReceiver.getInstance();
-                    r.setStepCumulativeMidnight(nbStepOfDay);
+                    r.saveStepSaveMidnight(getApplicationContext(),nbStepOfDay);
                     lab.addStepActivity("Field: " + field.getName() + " Value: " + nbStepOfDay);
                 }
             });
@@ -369,7 +370,7 @@ public class MainActivity extends AppCompatActivity implements OnDataPointListen
 
     private void resetStepSaveMidnight() {
         sharedPrefStep = PreferenceManager.getDefaultSharedPreferences(this);
-        sharedPrefStep.edit().remove("THE_STEP_AT_MIDNIGHT").commit();
+        sharedPrefStep.edit().remove("THE_STEP_AT_MIDNIGHT").apply();
     }
 
     private void resetCounter(Context context) {

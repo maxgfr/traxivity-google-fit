@@ -3,7 +3,10 @@ package com.maxgfr.travixityfitapp.fit;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.preference.PreferenceManager;
+
+import com.maxgfr.travixityfitapp.MainActivity;
 
 /**
  * Created by maxime on 26-May-17.
@@ -11,11 +14,8 @@ import android.preference.PreferenceManager;
 
 public class ResetBroadcastReceiver extends BroadcastReceiver  {
 
-    private int nbStepCumulativeMidnight;
-
-    public int getStepCumalativeMidnight () {return nbStepCumulativeMidnight;}
-
-    public void setStepCumulativeMidnight (int n) { nbStepCumulativeMidnight = n;}
+    // ShareDailyStep
+    private SharedPreferences sharedPrefStepCumulutative;
 
     /** Instance unique non préinitialisée */
     private static ResetBroadcastReceiver INSTANCE = null;
@@ -39,9 +39,24 @@ public class ResetBroadcastReceiver extends BroadcastReceiver  {
                 .edit().remove("THE_STEP_OF_CURRENT_DAY").commit();
     }*/
 
+    public int readStepSaveMidnight (Context main) {
+        sharedPrefStepCumulutative = PreferenceManager.getDefaultSharedPreferences(main);
+        return sharedPrefStepCumulutative.getInt("STEP_CUMULUTATIVE",0);
+    }
+
+    public void saveStepSaveMidnight(Context main, int n) {
+        sharedPrefStepCumulutative = PreferenceManager.getDefaultSharedPreferences(main);
+        sharedPrefStepCumulutative.edit().putInt("STEP_CUMULUTATIVE",n).apply();
+    }
+
     @Override
     public void onReceive(Context context, Intent intent) {
+
+        //aller dans ondatapoint pour prendre la valeur actuelle
+
+        int n = readStepSaveMidnight(context);
+
         PreferenceManager.getDefaultSharedPreferences(context)
-                .edit().putInt("THE_STEP_AT_MIDNIGHT",getStepCumalativeMidnight()).apply();
+                .edit().putInt("THE_STEP_AT_MIDNIGHT",n).apply();
     }
 }
